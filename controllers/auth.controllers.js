@@ -1,11 +1,11 @@
-import User from "../models/user.model";
+import User from "../models/user.model.js";
 import bcrypt from "bcryptjs";
-import genToken from "../utils/token";
+import genToken from "../utils/token.js";
 
 export const signUp = async (req, res) => {
     try {
         const { fullName, email, password, mobile, role } = req.body;
-        const user = await User.findOne({ email });
+        let user = await User.findOne({ email });
 
         if (user) {
             return res.status(400).json({ message: "User already exists" });
@@ -19,11 +19,9 @@ export const signUp = async (req, res) => {
        
         const hashedPassword = await bcrypt.hash(password, 10);
 
-        user = await User.create({ fullName, email, password: hashedPassword, mobile, role });
-        res.status(201).json({ user });
-
-        const token = await genToken(user._id);
-        res.status(201).json({ user, token });
+        const newUser = await User.create({ fullName, email, password: hashedPassword, mobile, role });
+        const token = await genToken(newUser._id);
+        res.status(201).json({ user: newUser, token });
         res.cookie("token", token, { httpOnly: true, secure: false,sameSite: "strict",   maxAge: 24 * 60 * 60 * 1000 });
         
     } catch (error) {
@@ -34,7 +32,7 @@ export const signUp = async (req, res) => {
 export const signIn = async (req, res) => {
     try {
         const { email, password } = req.body;
-        const user = await User.findOne({ email });
+        let user = await User.findOne({ email });
         if(!user) {
             return res.status(400).json({ message: "User not found" });
         }
@@ -43,8 +41,8 @@ export const signIn = async (req, res) => {
             return res.status(400).json({ message: "Invalid password" });
         }
         const token = await genToken(user._id);
-        res.status(201).json({ user, token });
-        res.cookie("token", token, { httpOnly: true, secure: false,sameSite: "strict",   maxAge: 24 * 60 * 60 * 1000 }); 
+        res.cookie("token", token, { httpOnly: true, secure: false,sameSite: "strict",   maxAge: 24 * 60 * 60 * 1000 });
+        res.status(201).json({ user, token }); 
     
         
     } catch (error) {
@@ -59,4 +57,5 @@ export const signOut=async(req,res)=>{
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
+
 }
