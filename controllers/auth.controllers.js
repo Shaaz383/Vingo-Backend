@@ -177,4 +177,72 @@ export const resetPassword = async (req, res) => {
     }
 };
 
+// Google OAuth authentication
+export const googleAuth = async (req, res) => {
+    try {
+        const { googleId, email, fullName, profilePicture } = req.body;
+
+        if (!googleId || !email || !fullName) {
+            return res.status(400).json({ message: "Google ID, email, and full name are required" });
+        }
+
+        // Check if user already exists with this Google ID
+        let user = await User.findOne({ googleId });
+
+        if (user) {
+            // User exists, generate token and sign them in
+            const token = await genToken(user._id);
+            res.cookie("token", token, { 
+                httpOnly: true, 
+                secure: false, 
+                sameSite: "strict", 
+                maxAge: 24 * 60 * 60 * 1000 
+            });
+            return res.status(200).json({ user, token });
+        }
+
+        // Check if user exists with this email but different auth method
+        user = await User.findOne({ email });
+        if (user) {
+            // Link Google account to existing user
+            user.googleId = googleId;
+            user.isGoogleUser = true;
+            user.profilePicture = profilePicture;
+            await user.save();
+
+            const token = await genToken(user._id);
+            res.cookie("token", token, { 
+                httpOnly: true, 
+                secure: false, 
+                sameSite: "strict", 
+                maxAge: 24 * 60 * 60 * 1000 
+            });
+            return res.status(200).json({ user, token });
+        }
+
+        // Create new user with Google authentication
+        const newUser = await User.create({
+            googleId,
+            email,
+            fullName,
+            profilePicture,
+            isGoogleUser: true,
+            role: "user" // Default role for Google users
+        });
+
+        const token = await genToken(newUser._id);
+        res.cookie("token", token, { 
+            httpOnly: true, 
+            secure: false, 
+            sameSite: "strict", 
+            maxAge: 24 * 60 * 60 * 1000 
+        });
+
+        res.status(201).json({ user: newUser, token });
+    } catch (error) {
+        console.error("Google auth error:", error);
+        res.status(500).json({ message: error.message });
+    }
+};
+
 

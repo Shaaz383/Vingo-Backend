@@ -15,14 +15,27 @@ const userSchema = new mongoose.Schema({
     },
     mobile: {
         type: String,
-        required: true,
-        unique: true 
+        unique: true,
+        sparse: true // Allows null values but ensures uniqueness when present
     },
     role: {
         type: String,
         enum: ["owner", "user", "deliveryBoy"],
         required: true,
         default: "user"
+    },
+    // Google OAuth fields
+    googleId: {
+        type: String,
+        unique: true,
+        sparse: true
+    },
+    profilePicture: {
+        type: String
+    },
+    isGoogleUser: {
+        type: Boolean,
+        default: false
     },
     resetOtp:{
         type:String,
