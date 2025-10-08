@@ -22,8 +22,8 @@ export const signUp = async (req, res) => {
 
         const newUser = await User.create({ fullName, email, password: hashedPassword, mobile, role });
         const token = await genToken(newUser._id);
+        res.cookie("token", token, { httpOnly: true, secure: false, sameSite: "strict", maxAge: 24 * 60 * 60 * 1000 });
         res.status(201).json({ user: newUser, token });
-        res.cookie("token", token, { httpOnly: true, secure: false,sameSite: "strict",   maxAge: 24 * 60 * 60 * 1000 });
         
     } catch (error) {
         res.status(500).json({ message: error.message });
@@ -42,8 +42,8 @@ export const signIn = async (req, res) => {
             return res.status(400).json({ message: "Invalid password" });
         }
         const token = await genToken(user._id);
-        res.cookie("token", token, { httpOnly: true, secure: false,sameSite: "strict",   maxAge: 24 * 60 * 60 * 1000 });
-        res.status(201).json({ user, token }); 
+        res.cookie("token", token, { httpOnly: true, secure: false, sameSite: "strict", maxAge: 24 * 60 * 60 * 1000 });
+        res.status(200).json({ user, token }); 
     
         
     } catch (error) {

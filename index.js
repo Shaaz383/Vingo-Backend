@@ -3,6 +3,8 @@ import dotenv from "dotenv";
 import connectDB from "./config/db.js";
 import authRouter from "./routes/auth.routes.js";
 import userRouter from "./routes/user.routes.js";  
+import shopRouter from "./routes/shop.routes.js";
+import itemRouter from "./routes/item.routes.js";
 import cookieParser from "cookie-parser";
 import cors from "cors";
 
@@ -20,6 +22,8 @@ app.use(cors({
 
 app.use("/api/auth", authRouter);
 app.use("/api/user", userRouter); 
+app.use("/api/shop", shopRouter);
+app.use("/api/item", itemRouter);
 
 app.listen(PORT, () => {
   connectDB();
