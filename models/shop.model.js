@@ -33,6 +33,10 @@ const shopSchema = new mongoose.Schema(
         required: [true, "Pincode is required"],
         trim: true,
     },
+    image: {
+      type: String,
+      trim: true,
+    },
     items:{
       type: [mongoose.Schema.Types.ObjectId],
       ref: "Item",

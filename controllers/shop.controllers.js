@@ -16,9 +16,9 @@ export const createEditShop = async (req , res)=>{
             })
         }
         else{
-            shop = await Shop.findByIdAndUpdate(shop._id,{
-                name, city, state, address, pincode, image , owner:req.userId
-            },{new:true})
+            const update = { name, city, state, address, pincode, owner:req.userId };
+            if (image) update.image = image;
+            shop = await Shop.findByIdAndUpdate(shop._id, update, { new: true })
         }
         await shop.populate("owner")
         return res.status(201).json(shop)
