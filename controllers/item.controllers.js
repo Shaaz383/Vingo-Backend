@@ -5,7 +5,7 @@ import uploadOnCloudinary from "../utils/cloudinary.js";
 // ======================= ADD ITEM =======================
 export const addItem = async (req, res) => {
   try {
-    const { name, category, foodType, price } = req.body;
+    const { name, category, foodType, price, description, quantity } = req.body;
     let image;
 
     // upload image if provided
@@ -25,9 +25,14 @@ export const addItem = async (req, res) => {
       category,
       foodType,
       price,
+      description,
+      quantity,
       image,
       shop: shop._id,
     });
+
+    // link item to shop (for item count/relations)
+    await Shop.findByIdAndUpdate(shop._id, { $push: { items: newItem._id } });
 
     return res.status(201).json({
       success: true,

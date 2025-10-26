@@ -8,19 +8,19 @@ const itemSchema = new mongoose.Schema({
   },
   description: {
     type: String,
-    required: [true, "Description is required"],
     trim: true,
+    default: "",
   },
   price: {
     type: Number,
     default: 0,
     min: 0,
-
     required: [true, "Price is required"],
   },
   quantity: {
     type: Number,
-    required: [true, "Quantity is required"],
+    min: 0,
+    default: 1,
   },
   image: {
     type: String,
