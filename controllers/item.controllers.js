@@ -46,6 +46,28 @@ export const addItem = async (req, res) => {
   }
 };
 
+// ======================= GET SHOP ITEMS =======================
+export const getShopItems = async (req, res) => {
+  try {
+    // find shop by owner (current user)
+    const shop = await Shop.findOne({ owner: req.userId });
+    if (!shop) {
+      return res.status(400).json({ message: "Shop not found" });
+    }
+
+    // get all items for this shop
+    const items = await Item.find({ shop: shop._id });
+
+    return res.status(200).json({
+      success: true,
+      items,
+      count: items.length,
+    });
+  } catch (error) {
+    return res.status(500).json({ message: `Get shop items error: ${error.message}` });
+  }
+};
+
 // ======================= EDIT ITEM =======================
 export const editItem = async (req, res) => {
   try {
