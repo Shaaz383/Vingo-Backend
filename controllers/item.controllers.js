@@ -118,3 +118,25 @@ export const deleteItem = async (req, res) => {
     return res.status(500).json({ message: `Delete item error: ${error.message}` });
   }
 };
+
+// ======================= LIST ITEMS BY CITY (for users) =======================
+export const listItemsByCity = async (req, res) => {
+  try {
+    const { city } = req.query;
+    if (!city) {
+      return res.status(400).json({ message: "City query parameter is required" });
+    }
+
+    const cityRegex = new RegExp(`^${String(city).trim()}$`, "i");
+    const shopsInCity = await Shop.find({ city: cityRegex }).select("_id name city");
+    const shopIds = shopsInCity.map(s => s._id);
+
+    const items = await Item.find({ shop: { $in: shopIds } })
+      .populate({ path: 'shop', select: 'name city' })
+      .select('name price image category foodType shop');
+
+    return res.status(200).json({ success: true, count: items.length, items });
+  } catch (error) {
+    return res.status(500).json({ message: `List items by city error: ${error?.message || error}` });
+  }
+};
