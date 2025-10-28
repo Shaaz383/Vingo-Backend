@@ -40,3 +40,21 @@ export const getMyShop = async  (req , res)=>{
     }
 }
 
+// List shops by city (case-insensitive)
+export const getShopsByCity = async (req, res) => {
+    try {
+        const { city } = req.query;
+        if (!city) {
+            return res.status(400).json({ message: "City query parameter is required" });
+        }
+
+        // Case-insensitive match; trim spaces
+        const cityRegex = new RegExp(`^${String(city).trim()}$`, 'i');
+        const shops = await Shop.find({ city: cityRegex }).select('name city state address image');
+
+        return res.status(200).json({ success: true, count: shops.length, shops });
+    } catch (error) {
+        return res.status(500).json({ message: `get shops by city error ${error?.message || error}` });
+    }
+}
+
