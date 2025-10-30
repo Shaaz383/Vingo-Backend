@@ -256,3 +256,104 @@ export const getOrderById = async (req, res) => {
     });
   }
 };
+
+/**
+ * Get all orders for the shop owner
+ * @route GET /api/orders/shop
+ * @access Private (Shop Owner)
+ */
+export const getShopOrders = async (req, res) => {
+  try {
+    // Find shop owned by current user
+    const shop = await Shop.findOne({ owner: req.userId });
+    
+    if (!shop) {
+      return res.status(404).json({ message: "Shop not found" });
+    }
+    
+    // Find all shop orders for this shop
+    const shopOrders = await ShopOrder.find({ shop: shop._id })
+      .sort({ createdAt: -1 })
+      .populate({
+        path: 'order',
+        populate: {
+          path: 'user',
+          select: 'fullName email phone'
+        }
+      })
+      .populate('items')
+      .populate({
+        path: 'items',
+        populate: {
+          path: 'item',
+          select: 'name image'
+        }
+      });
+    
+    return res.status(200).json({
+      success: true,
+      shopOrders
+    });
+  } catch (error) {
+    console.error("Error fetching shop orders:", error);
+    return res.status(500).json({
+      message: "Failed to fetch shop orders",
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Update shop order status
+ * @route PATCH /api/orders/shop/:id/status
+ * @access Private (Shop Owner)
+ */
+export const updateShopOrderStatus = async (req, res) => {
+  try {
+    const { status } = req.body;
+    
+    if (!status) {
+      return res.status(400).json({ message: "Status is required" });
+    }
+    
+    // Validate status
+    const validStatuses = ['pending', 'accepted', 'rejected', 'preparing', 'out for delivery', 'delivered', 'cancelled'];
+    if (!validStatuses.includes(status.toLowerCase())) {
+      return res.status(400).json({ message: "Invalid status" });
+    }
+    
+    // Find shop owned by current user
+    const shop = await Shop.findOne({ owner: req.userId });
+    
+    if (!shop) {
+      return res.status(404).json({ message: "Shop not found" });
+    }
+    
+    // Find the shop order and ensure it belongs to this shop
+    const shopOrder = await ShopOrder.findById(req.params.id);
+    
+    if (!shopOrder) {
+      return res.status(404).json({ message: "Shop order not found" });
+    }
+    
+    if (shopOrder.shop.toString() !== shop._id.toString()) {
+      return res.status(403).json({ message: "Not authorized to update this order" });
+    }
+    
+    // Update the status
+    shopOrder.status = status.toLowerCase();
+    await shopOrder.save();
+    
+    return res.status(200).json({
+      success: true,
+      message: "Order status updated successfully",
+      shopOrder
+    });
+  } catch (error) {
+    console.error("Error updating shop order status:", error);
+    return res.status(500).json({
+      message: "Failed to update order status",
+      error: error.message
+    });
+  }
+};
