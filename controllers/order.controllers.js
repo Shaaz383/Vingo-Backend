@@ -190,11 +190,22 @@ export const getMyOrders = async (req, res) => {
       .sort({ createdAt: -1 })
       .populate({
         path: 'shopOrders',
-        populate: {
-          path: 'shop',
-          select: 'name image'
-        }
-      });
+        populate: [
+          {
+            path: 'shop',
+            select: 'name image address'
+          },
+          {
+            path: 'items',
+            select: 'item itemName priceAtPurchase quantity total',
+            populate: {
+              path: 'item',
+              select: 'name image price'
+            }
+          }
+        ]
+      })
+      .populate('user', 'name email');
     
     return res.status(200).json({
       success: true,
