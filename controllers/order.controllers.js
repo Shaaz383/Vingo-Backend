@@ -329,8 +329,8 @@ export const updateShopOrderStatus = async (req, res) => {
       return res.status(400).json({ message: "Status is required" });
     }
     
-    // Validate status
-    const validStatuses = ['pending', 'accepted', 'rejected', 'preparing', 'out for delivery', 'delivered', 'cancelled'];
+    // Validate status (must match ShopOrder model enum)
+    const validStatuses = ['pending', 'accepted', 'preparing', 'ready_for_pickup', 'out_for_delivery', 'delivered', 'cancelled'];
     if (!validStatuses.includes(status.toLowerCase())) {
       return res.status(400).json({ message: "Invalid status" });
     }
