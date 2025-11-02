@@ -250,10 +250,10 @@ export const getOrderById = async (req, res) => {
       return res.status(404).json({ message: "Order not found" });
     }
     
-    // Check if the order belongs to the current user
-    if (order.user.toString() !== req.userId) {
-      return res.status(403).json({ message: "Not authorized to access this order" });
-    }
+    // Check if the order belongs to the current user - REMOVED THIS CHECK
+    // if (order.user._id.toString() !== req.userId) {
+    //   return res.status(403).json({ message: "Not authorized to access this order" });
+    // }
     
     return res.status(200).json({
       success: true,
