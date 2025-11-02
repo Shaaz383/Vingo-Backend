@@ -319,6 +319,8 @@ export const getShopOrders = async (req, res) => {
  * @route PATCH /api/orders/shop/:id/status
  * @access Private (Shop Owner)
  */
+import { socketIO } from '../index.js';
+
 export const updateShopOrderStatus = async (req, res) => {
   try {
     const { status } = req.body;
@@ -341,7 +343,7 @@ export const updateShopOrderStatus = async (req, res) => {
     }
     
     // Find the shop order and ensure it belongs to this shop
-    const shopOrder = await ShopOrder.findById(req.params.id);
+    const shopOrder = await ShopOrder.findById(req.params.id).populate('order');
     
     if (!shopOrder) {
       return res.status(404).json({ message: "Shop order not found" });
@@ -354,6 +356,14 @@ export const updateShopOrderStatus = async (req, res) => {
     // Update the status
     shopOrder.status = status.toLowerCase();
     await shopOrder.save();
+    
+    // Emit socket event for real-time updates
+    socketIO.emit('orderStatusUpdated', {
+      orderId: shopOrder.order?._id,
+      shopOrderId: shopOrder._id,
+      status: shopOrder.status,
+      shopId: shopOrder.shop
+    });
     
     return res.status(200).json({
       success: true,
