@@ -4,6 +4,7 @@ import ShopOrderItem from "../models/shopOrderItem.model.js";
 import Item from "../models/item.modal.js";
 import Shop from "../models/shop.model.js";
 import mongoose from "mongoose";
+import { getNextDeliveryBoy } from "../utils/delivery.utils.js";
 
 /**
  * Place a new order
@@ -102,6 +103,7 @@ export const placeOrder = async (req, res) => {
       totalAmount += total;
       totalQuantity += shopTotalQuantity;
       
+      const deliveryBoyId = await getNextDeliveryBoy();
       // Create shop order
       const shopOrder = new ShopOrder({
         order: order._id,
@@ -110,7 +112,8 @@ export const placeOrder = async (req, res) => {
         tax,
         deliveryFee,
         total,
-        items: [] // Will be populated after creating shop order items
+        items: [], // Will be populated after creating shop order items
+        deliveryBoy: deliveryBoyId,
       });
       
       // Create shop order items
