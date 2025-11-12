@@ -5,6 +5,7 @@ import Item from "../models/item.modal.js";
 import Shop from "../models/shop.model.js";
 import mongoose from "mongoose";
 import { getNextDeliveryBoy } from "../utils/delivery.utils.js";
+import { socketIO } from '../index.js'; // Ensure socketIO is imported
 
 /**
  * Place a new order
@@ -113,7 +114,7 @@ export const placeOrder = async (req, res) => {
         deliveryFee,
         total,
         items: [], // Will be populated after creating shop order items
-        deliveryBoy: deliveryBoyId,
+        deliveryBoy: deliveryBoyId, // Assigned a delivery boy immediately
       });
       
       // Create shop order items
@@ -143,6 +144,16 @@ export const placeOrder = async (req, res) => {
         );
       }));
       
+      // Notify delivery boy about new order request immediately (Status: pending)
+      if (deliveryBoyId) {
+          socketIO.to(deliveryBoyId.toString()).emit('newOrderRequest', {
+            orderId: order._id,
+            shopOrderId: shopOrder._id,
+            shopName: shop.name,
+            total: shopOrder.total,
+          });
+      }
+
       return shopOrder;
     });
     
@@ -159,10 +170,17 @@ export const placeOrder = async (req, res) => {
     const populatedOrder = await Order.findById(order._id)
       .populate({
         path: 'shopOrders',
-        populate: {
-          path: 'items',
-          model: 'ShopOrderItem'
-        }
+        populate: [
+            {
+                path: 'items',
+                model: 'ShopOrderItem'
+            },
+            {
+                path: 'deliveryBoy',
+                model: 'User',
+                select: 'fullName mobile profilePicture'
+            }
+        ]
       })
       .populate('user', 'name email');
     
@@ -205,6 +223,11 @@ export const getMyOrders = async (req, res) => {
               path: 'item',
               select: 'name image price'
             }
+          },
+          {
+            path: 'deliveryBoy',
+            model: 'User',
+            select: 'fullName mobile profilePicture'
           }
         ]
       })
@@ -244,6 +267,11 @@ export const getOrderById = async (req, res) => {
               path: 'item',
               select: 'name image'
             }
+          },
+          {
+            path: 'deliveryBoy',
+            model: 'User',
+            select: 'fullName mobile profilePicture'
           }
         ]
       })
@@ -302,7 +330,8 @@ export const getShopOrders = async (req, res) => {
           path: 'item',
           select: 'name image'
         }
-      });
+      })
+      .populate('deliveryBoy', 'fullName mobile profilePicture'); // Populate delivery boy details
     
     return res.status(200).json({
       success: true,
@@ -322,7 +351,7 @@ export const getShopOrders = async (req, res) => {
  * @route PATCH /api/orders/shop/:id/status
  * @access Private (Shop Owner)
  */
-import { socketIO } from '../index.js';
+
 
 export const updateShopOrderStatus = async (req, res) => {
   try {
@@ -346,7 +375,10 @@ export const updateShopOrderStatus = async (req, res) => {
     }
     
     // Find the shop order and ensure it belongs to this shop
-    const shopOrder = await ShopOrder.findById(req.params.id).populate('order');
+    const shopOrder = await ShopOrder.findById(req.params.id)
+        .populate('order')
+        .populate('deliveryBoy', 'fullName mobile profilePicture'); // Populate delivery boy
+
     
     if (!shopOrder) {
       return res.status(404).json({ message: "Shop order not found" });
@@ -356,22 +388,42 @@ export const updateShopOrderStatus = async (req, res) => {
       return res.status(403).json({ message: "Not authorized to update this order" });
     }
     
+    // Check if status is transitioning to 'accepted' and emit event to Delivery Boy
+    if (status.toLowerCase() === 'accepted' && shopOrder.status === 'pending') {
+        if (shopOrder.deliveryBoy) {
+             // Emit a specific event when the shop accepts the order.
+            socketIO.to(shopOrder.deliveryBoy.toString()).emit('deliveryOrderAcceptedByShop', {
+                shopOrderId: shopOrder._id,
+                orderId: shopOrder.order._id,
+                shopName: shop.name,
+                customerAddress: shopOrder.order.deliveryAddress.addressLine,
+                total: shopOrder.total
+            });
+        }
+    }
+
     // Update the status
     shopOrder.status = status.toLowerCase();
     await shopOrder.save();
     
-    // Emit socket event for real-time updates
+    // Emit socket event for real-time updates to User/Owner
     socketIO.emit('orderStatusUpdated', {
       orderId: shopOrder.order?._id,
       shopOrderId: shopOrder._id,
       status: shopOrder.status,
-      shopId: shopOrder.shop
+      shopId: shopOrder.shop,
+      deliveryBoy: shopOrder.deliveryBoy // Include DB details
     });
+    
+    // Refetch the order with populated fields to return to the frontend
+    const updatedShopOrder = await ShopOrder.findById(shopOrder._id)
+        .populate('order')
+        .populate('deliveryBoy', 'fullName mobile profilePicture');
     
     return res.status(200).json({
       success: true,
       message: "Order status updated successfully",
-      shopOrder
+      shopOrder: updatedShopOrder
     });
   } catch (error) {
     console.error("Error updating shop order status:", error);

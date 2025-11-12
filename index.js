@@ -23,8 +23,12 @@ const io = new Server(httpServer, {
   }
 });
 
+// Map to store userId -> socketId
+const users = new Map();
+
 // Make io accessible to other modules
 export const socketIO = io;
+export const onlineUsers = users; // Export users map for targeted emission
 
 const PORT = process.env.PORT || 3000;
 
@@ -45,9 +49,26 @@ app.use("/api/delivery", deliveryRouter);
 // Socket.io connection handling
 io.on("connection", (socket) => {
   console.log("A user connected:", socket.id);
-  
+
+  // New: Handle user registration (must be emitted from client on login)
+  socket.on('register', (userId) => {
+    if (userId) {
+        users.set(userId, socket.id);
+        console.log(`User ${userId} registered with socket ${socket.id}`);
+        // For targeted emissions, we use io.to(users.get(userId)).emit(...)
+    }
+  });
+
   socket.on("disconnect", () => {
     console.log("User disconnected:", socket.id);
+    // Remove user from map on disconnect
+    for (let [userId, socketId] of users.entries()) {
+        if (socketId === socket.id) {
+            users.delete(userId);
+            console.log(`User ${userId} deregistered`);
+            break;
+        }
+    }
   });
 });
 
