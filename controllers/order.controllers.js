@@ -323,7 +323,6 @@ export const getShopOrders = async (req, res) => {
           select: 'fullName email phone'
         }
       })
-      .populate('items')
       .populate({
         path: 'items',
         populate: {
@@ -391,14 +390,20 @@ export const updateShopOrderStatus = async (req, res) => {
     // Check if status is transitioning to 'accepted' and emit event to Delivery Boy
     if (status.toLowerCase() === 'accepted' && shopOrder.status === 'pending') {
         if (shopOrder.deliveryBoy) {
-             // Emit a specific event when the shop accepts the order.
-            socketIO.to(shopOrder.deliveryBoy.toString()).emit('deliveryOrderAcceptedByShop', {
-                shopOrderId: shopOrder._id,
-                orderId: shopOrder.order._id,
-                shopName: shop.name,
-                customerAddress: shopOrder.order.deliveryAddress.addressLine,
-                total: shopOrder.total
-            });
+            const deliveryBoySocketId = onlineUsers.get(shopOrder.deliveryBoy._id.toString()); // Get socket ID
+            if (deliveryBoySocketId) { // Only emit if the delivery boy is online
+                 // Emit a specific event when the shop accepts the order.
+                socketIO.to(deliveryBoySocketId).emit('deliveryOrderAcceptedByShop', {
+                    shopOrderId: shopOrder._id,
+                    orderId: shopOrder.order._id,
+                    shopName: shop.name,
+                    customerAddress: shopOrder.order.deliveryAddress.addressLine,
+                    total: shopOrder.total
+                });
+            } else {
+                console.log(`Delivery boy ${shopOrder.deliveryBoy._id} is not online.`);
+                // Optionally, handle offline delivery boy (e.g., push notification)
+            }
         }
     }
 
