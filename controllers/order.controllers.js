@@ -160,10 +160,14 @@ export const placeOrder = async (req, res) => {
 
     // --- NEW LOGIC: Notify all available delivery boys ---
     const availableDeliveryBoys = await getAllAvailableDeliveryBoys();
+    console.log(`Found ${availableDeliveryBoys.length} available delivery boys.`);
     if (availableDeliveryBoys.length > 0) {
         shopOrders.forEach(shopOrder => {
             availableDeliveryBoys.forEach(db => {
-                const deliveryBoySocketId = onlineUsers.get(db._id.toString());
+                const deliveryBoyIdString = db._id.toString();
+                const deliveryBoySocketId = onlineUsers.get(deliveryBoyIdString);
+                console.log(`Checking delivery boy ${db.fullName} (${deliveryBoyIdString}). Socket ID found: ${deliveryBoySocketId}`);
+
                 if (deliveryBoySocketId) {
                     socketIO.to(deliveryBoySocketId).emit('newOrderRequest', {
                         shopOrderId: shopOrder._id,
@@ -173,9 +177,9 @@ export const placeOrder = async (req, res) => {
                         customerAddress: order.deliveryAddress.addressLine, // Pass customer address
                         // Add any other relevant details for the delivery boy to decide
                     });
-                    console.log(`Emitted 'newOrderRequest' for shopOrder ${shopOrder._id} to delivery boy ${db.fullName} (${db._id})`);
+                    console.log(`Emitted 'newOrderRequest' for shopOrder ${shopOrder._id} to delivery boy ${db.fullName} (${deliveryBoyIdString}) on socket ${deliveryBoySocketId}`);
                 } else {
-                    console.log(`Delivery boy ${db.fullName} (${db._id}) is offline. Cannot send newOrderRequest.`);
+                    console.log(`Delivery boy ${db.fullName} (${deliveryBoyIdString}) is offline or not registered with socket. Cannot send newOrderRequest.`);
                 }
             });
         });
@@ -426,7 +430,15 @@ export const updateShopOrderStatus = async (req, res) => {
     // }
 
     // Update the status
-    shopOrder.status = status.toLowerCase();
+    // If owner tries to 'accept' an order that has no delivery boy yet, keep it pending
+    if (status.toLowerCase() === 'accepted' && !shopOrder.deliveryBoy) {
+        // Do not change status to 'accepted' here, it remains 'pending' for delivery boy acceptance
+        // The owner's 'acceptance' in this context means they acknowledge the order and it's ready for DBs
+        // The actual status change to 'accepted' happens when a delivery boy picks it up.
+        console.log(`Shop owner attempted to accept order ${shopOrder._id} but no delivery boy assigned. Status remains pending.`);
+    } else {
+        shopOrder.status = status.toLowerCase();
+    }
     await shopOrder.save();
     
     // Emit socket event for real-time updates to User/Owner
