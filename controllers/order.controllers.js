@@ -4,8 +4,8 @@ import ShopOrderItem from "../models/shopOrderItem.model.js";
 import Item from "../models/item.modal.js";
 import Shop from "../models/shop.model.js";
 import mongoose from "mongoose";
-import { getNextDeliveryBoy } from "../utils/delivery.utils.js";
-import { socketIO } from '../index.js'; // Ensure socketIO is imported
+import { getAllAvailableDeliveryBoys } from "../utils/delivery.utils.js";
+import { socketIO, onlineUsers } from '../index.js'; // Ensure socketIO and onlineUsers are imported
 
 /**
  * Place a new order
@@ -104,8 +104,7 @@ export const placeOrder = async (req, res) => {
       totalAmount += total;
       totalQuantity += shopTotalQuantity;
       
-      const deliveryBoyId = await getNextDeliveryBoy();
-      // Create shop order
+      // No delivery boy assigned at this stage
       const shopOrder = new ShopOrder({
         order: order._id,
         shop: shop._id,
@@ -114,7 +113,7 @@ export const placeOrder = async (req, res) => {
         deliveryFee,
         total,
         items: [], // Will be populated after creating shop order items
-        deliveryBoy: deliveryBoyId, // Assigned a delivery boy immediately
+        // deliveryBoy: deliveryBoyId, // Removed direct assignment
       });
       
       // Create shop order items
@@ -144,15 +143,8 @@ export const placeOrder = async (req, res) => {
         );
       }));
       
-      // Notify delivery boy about new order request immediately (Status: pending)
-      if (deliveryBoyId) {
-          socketIO.to(deliveryBoyId.toString()).emit('newOrderRequest', {
-            orderId: order._id,
-            shopOrderId: shopOrder._id,
-            shopName: shop.name,
-            total: shopOrder.total,
-          });
-      }
+      // Removed direct notification to a single delivery boy here
+      // The notification to all available delivery boys will happen after all shop orders are created.
 
       return shopOrder;
     });
@@ -165,6 +157,32 @@ export const placeOrder = async (req, res) => {
     order.shopOrders = shopOrders.map(shopOrder => shopOrder._id);
     
     await order.save();
+
+    // --- NEW LOGIC: Notify all available delivery boys ---
+    const availableDeliveryBoys = await getAllAvailableDeliveryBoys();
+    if (availableDeliveryBoys.length > 0) {
+        shopOrders.forEach(shopOrder => {
+            availableDeliveryBoys.forEach(db => {
+                const deliveryBoySocketId = onlineUsers.get(db._id.toString());
+                if (deliveryBoySocketId) {
+                    socketIO.to(deliveryBoySocketId).emit('newOrderRequest', {
+                        shopOrderId: shopOrder._id,
+                        orderId: shopOrder.order._id,
+                        shopName: shopOrder.shop.name, // Assuming shop is populated or can be fetched
+                        total: shopOrder.total,
+                        customerAddress: order.deliveryAddress.addressLine, // Pass customer address
+                        // Add any other relevant details for the delivery boy to decide
+                    });
+                    console.log(`Emitted 'newOrderRequest' for shopOrder ${shopOrder._id} to delivery boy ${db.fullName} (${db._id})`);
+                } else {
+                    console.log(`Delivery boy ${db.fullName} (${db._id}) is offline. Cannot send newOrderRequest.`);
+                }
+            });
+        });
+    } else {
+        console.log('No available delivery boys to notify for new orders.');
+    }
+    // --- END NEW LOGIC ---
     
     // Fetch the complete order with populated data
     const populatedOrder = await Order.findById(order._id)
@@ -387,25 +405,25 @@ export const updateShopOrderStatus = async (req, res) => {
       return res.status(403).json({ message: "Not authorized to update this order" });
     }
     
-    // Check if status is transitioning to 'accepted' and emit event to Delivery Boy
-    if (status.toLowerCase() === 'accepted' && shopOrder.status === 'pending') {
-        if (shopOrder.deliveryBoy) {
-            const deliveryBoySocketId = onlineUsers.get(shopOrder.deliveryBoy._id.toString()); // Get socket ID
-            if (deliveryBoySocketId) { // Only emit if the delivery boy is online
-                 // Emit a specific event when the shop accepts the order.
-                socketIO.to(deliveryBoySocketId).emit('deliveryOrderAcceptedByShop', {
-                    shopOrderId: shopOrder._id,
-                    orderId: shopOrder.order._id,
-                    shopName: shop.name,
-                    customerAddress: shopOrder.order.deliveryAddress.addressLine,
-                    total: shopOrder.total
-                });
-            } else {
-                console.log(`Delivery boy ${shopOrder.deliveryBoy._id} is not online.`);
-                // Optionally, handle offline delivery boy (e.g., push notification)
-            }
-        }
-    }
+    // Check if status is transitioning to 'accepted' and emit event to Delivery Boy - REMOVED
+    // if (status.toLowerCase() === 'accepted' && shopOrder.status === 'pending') {
+    //     if (shopOrder.deliveryBoy) {
+    //         const deliveryBoySocketId = onlineUsers.get(shopOrder.deliveryBoy._id.toString()); // Get socket ID
+    //         if (deliveryBoySocketId) { // Only emit if the delivery boy is online
+    //              // Emit a specific event when the shop accepts the order.
+    //             socketIO.to(deliveryBoySocketId).emit('deliveryOrderAcceptedByShop', {
+    //                 shopOrderId: shopOrder._id,
+    //                 orderId: shopOrder.order._id,
+    //                 shopName: shop.name,
+    //                 customerAddress: shopOrder.order.deliveryAddress.addressLine,
+    //                 total: shopOrder.total
+    //             });
+    //         } else {
+    //             console.log(`Delivery boy ${shopOrder.deliveryBoy._id} is not online.`);
+    //             // Optionally, handle offline delivery boy (e.g., push notification)
+    //         }
+    //     }
+    // }
 
     // Update the status
     shopOrder.status = status.toLowerCase();

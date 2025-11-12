@@ -1,16 +1,11 @@
 import User from '../models/user.model.js';
 
-let lastAssignedIndex = 0;
-
-export const getNextDeliveryBoy = async () => {
-  const deliveryBoys = await User.find({ role: 'delivery' });
+export const getAllAvailableDeliveryBoys = async () => {
+  const deliveryBoys = await User.find({ role: 'deliveryBoy' }).select('_id fullName mobile'); // Select relevant fields
 
   if (deliveryBoys.length === 0) {
-    return null;
+    return [];
   }
 
-  const deliveryBoy = deliveryBoys[lastAssignedIndex];
-  lastAssignedIndex = (lastAssignedIndex + 1) % deliveryBoys.length;
-
-  return deliveryBoy._id;
+  return deliveryBoys;
 };

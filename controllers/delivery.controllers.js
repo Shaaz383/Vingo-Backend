@@ -1,5 +1,5 @@
 import ShopOrder from "../models/shopOrder.model.js";
-import { socketIO } from '../index.js'; // Ensure socketIO is imported
+import { socketIO, onlineUsers } from '../index.js'; // Ensure socketIO and onlineUsers are imported
 
 /**
  * Get all orders assigned to the current delivery boy
@@ -8,10 +8,17 @@ import { socketIO } from '../index.js'; // Ensure socketIO is imported
  */
 export const getMyAssignedOrders = async (req, res) => {
   try {
-    // Only fetch orders that are 'pending' or 'accepted' so the delivery boy can interact
     const orders = await ShopOrder.find({ 
-        deliveryBoy: req.userId,
-        status: { $in: ['pending', 'accepted', 'preparing', 'ready_for_pickup', 'out_for_delivery'] }
+        $or: [
+            { 
+                deliveryBoy: req.userId,
+                status: { $in: ['accepted', 'preparing', 'ready_for_pickup', 'out_for_delivery'] }
+            },
+            {
+                deliveryBoy: null,
+                status: 'pending'
+            }
+        ]
     })
       .sort({ createdAt: -1 })
       .populate("order")
@@ -59,6 +66,64 @@ export const updateOrderStatus = async (req, res) => {
 
     res.status(200).json({ success: true, message: "Order status updated successfully", order });
   } catch (error) {
+    res.status(500).json({ success: false, message: "Server error", error: error.message });
+  }
+};
+
+/**
+ * Delivery boy accepts an order
+ * @route PATCH /api/delivery/accept-order/:shopOrderId
+ * @access Private (Delivery Boy)
+ */
+export const acceptOrder = async (req, res) => {
+  try {
+    const { shopOrderId } = req.params;
+    const deliveryBoyId = req.userId;
+
+    let shopOrder = await ShopOrder.findById(shopOrderId).populate('shop');
+
+    if (!shopOrder) {
+      return res.status(404).json({ success: false, message: "Shop order not found" });
+    }
+
+    // Check if the order is already assigned to a delivery boy
+    if (shopOrder.deliveryBoy) {
+      return res.status(409).json({ success: false, message: "Order already accepted by another delivery boy" });
+    }
+
+    // Assign the current delivery boy and update status
+    shopOrder.deliveryBoy = deliveryBoyId;
+    shopOrder.status = 'accepted'; // Or a new status like 'delivery_accepted'
+    await shopOrder.save();
+
+    // Populate for response and socket emission
+    shopOrder = await shopOrder
+      .populate('order')
+      .populate('deliveryBoy', 'fullName mobile profilePicture');
+
+    // Notify the shop owner that the order has been accepted by a delivery boy
+    const shopOwnerId = shopOrder.shop.owner.toString();
+    const shopOwnerSocketId = onlineUsers.get(shopOwnerId);
+    if (shopOwnerSocketId) {
+      socketIO.to(shopOwnerSocketId).emit('orderAcceptedByDeliveryBoy', {
+        shopOrderId: shopOrder._id,
+        orderId: shopOrder.order._id,
+        deliveryBoy: shopOrder.deliveryBoy,
+        shopName: shopOrder.shop.name,
+        status: shopOrder.status,
+      });
+      console.log(`Emitted 'orderAcceptedByDeliveryBoy' for shopOrder ${shopOrder._id} to shop owner ${shopOwnerId}`);
+    } else {
+      console.log(`Shop owner ${shopOwnerId} is offline. Cannot send orderAcceptedByDeliveryBoy notification.`);
+    }
+
+    // Emit a general event to all delivery boys (or a specific room) to remove this order request
+    // This can be handled on the frontend by filtering out accepted orders
+    socketIO.emit('orderRequestAccepted', { shopOrderId: shopOrder._id, acceptedBy: deliveryBoyId });
+
+    res.status(200).json({ success: true, message: "Order accepted successfully", shopOrder });
+  } catch (error) {
+    console.error("Error accepting order:", error);
     res.status(500).json({ success: false, message: "Server error", error: error.message });
   }
 };
