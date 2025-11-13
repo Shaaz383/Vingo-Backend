@@ -8,13 +8,16 @@ import { socketIO, onlineUsers } from '../index.js'; // Ensure socketIO and onli
  */
 export const getMyAssignedOrders = async (req, res) => {
   try {
+    // Fetch assigned orders and new pending requests
     const orders = await ShopOrder.find({ 
         $or: [
             { 
                 deliveryBoy: req.userId,
+                // Only show relevant active statuses for assigned orders
                 status: { $in: ['accepted', 'preparing', 'ready_for_pickup', 'out_for_delivery'] }
             },
             {
+                // Show all pending orders that are not yet assigned (for the first-come-first-served pool)
                 deliveryBoy: null,
                 status: 'pending'
             }
@@ -22,7 +25,10 @@ export const getMyAssignedOrders = async (req, res) => {
     })
       .sort({ createdAt: -1 })
       .populate("order")
-      .populate("shop")
+      .populate({
+          path: "shop",
+          select: "name address owner" // Select owner to potentially send notifications
+      })
       .populate('deliveryBoy', 'fullName mobile profilePicture'); // Include DB details
 
     res.status(200).json({ success: true, orders });
@@ -44,14 +50,22 @@ export const updateOrderStatus = async (req, res) => {
     // Find the shop order and populate order/deliveryBoy details
     const order = await ShopOrder.findOne({ _id: orderId, deliveryBoy: req.userId })
         .populate('order')
-        .populate('deliveryBoy', 'fullName mobile profilePicture');
+        .populate('deliveryBoy', 'fullName mobile profilePicture')
+        .populate('shop'); // Populate shop to send comprehensive updates
 
     if (!order) {
       return res.status(404).json({ success: false, message: "Order not found or you are not assigned to it" });
     }
 
-    // Add logic here to ensure valid status transitions
-    order.status = status;
+    // Add logic here to ensure valid status transitions (basic validation)
+    const newStatus = status.toLowerCase();
+    const validStatuses = ['ready_for_pickup', 'out_for_delivery', 'delivered'];
+    
+    if (!validStatuses.includes(newStatus)) {
+        return res.status(400).json({ success: false, message: "Invalid status update for Delivery Boy" });
+    }
+    
+    order.status = newStatus;
     await order.save();
 
     // Emit socket event to notify all relevant parties (User and Owner/Shop)
@@ -60,7 +74,7 @@ export const updateOrderStatus = async (req, res) => {
         shopOrderId: order._id,
         status: order.status,
         shopId: order.shop,
-        deliveryBoy: order.deliveryBoy, // Include DB details
+        deliveryBoy: order.deliveryBoy, 
         userId: order.order.user // Include user ID for potential future direct targeting
     });
 
@@ -80,28 +94,33 @@ export const acceptOrder = async (req, res) => {
     const { shopOrderId } = req.params;
     const deliveryBoyId = req.userId;
 
-    let shopOrder = await ShopOrder.findById(shopOrderId).populate('shop');
+    // Find and populate shop (including owner ID) and order (including user ID)
+    let shopOrder = await ShopOrder.findById(shopOrderId)
+        .populate({ path: 'shop', select: 'name owner' }) 
+        .populate('order');
 
     if (!shopOrder) {
       return res.status(404).json({ success: false, message: "Shop order not found" });
     }
 
-    // Check if the order is already assigned to a delivery boy
+    // Check if the order is already assigned to a delivery boy OR is not pending
     if (shopOrder.deliveryBoy) {
       return res.status(409).json({ success: false, message: "Order already accepted by another delivery boy" });
+    }
+    if (shopOrder.status !== 'pending') {
+        return res.status(400).json({ success: false, message: `Order status is '${shopOrder.status}'. Only pending orders can be accepted.` });
     }
 
     // Assign the current delivery boy and update status
     shopOrder.deliveryBoy = deliveryBoyId;
-    shopOrder.status = 'accepted'; // Or a new status like 'delivery_accepted'
+    shopOrder.status = 'accepted'; 
     await shopOrder.save();
 
-    // Populate for response and socket emission
+    // Populate deliveryBoy for response and socket emission
     shopOrder = await shopOrder
-      .populate('order')
       .populate('deliveryBoy', 'fullName mobile profilePicture');
-
-    // Notify the shop owner that the order has been accepted by a delivery boy
+      
+    // 1. Notify the shop owner that the order has been accepted by a delivery boy
     const shopOwnerId = shopOrder.shop.owner.toString();
     const shopOwnerSocketId = onlineUsers.get(shopOwnerId);
     if (shopOwnerSocketId) {
@@ -116,10 +135,20 @@ export const acceptOrder = async (req, res) => {
     } else {
       console.log(`Shop owner ${shopOwnerId} is offline. Cannot send orderAcceptedByDeliveryBoy notification.`);
     }
+    
+    // 2. Emit a general status update to notify the user (customer) and all others interested.
+    socketIO.emit('orderStatusUpdated', {
+        orderId: shopOrder.order?._id,
+        shopOrderId: shopOrder._id,
+        status: shopOrder.status,
+        shopId: shopOrder.shop,
+        deliveryBoy: shopOrder.deliveryBoy,
+        userId: shopOrder.order.user
+    });
 
-    // Emit a general event to all delivery boys (or a specific room) to remove this order request
-    // This can be handled on the frontend by filtering out accepted orders
+    // 3. Emit an event to all delivery boys (or a specific room) to remove this order request
     socketIO.emit('orderRequestAccepted', { shopOrderId: shopOrder._id, acceptedBy: deliveryBoyId });
+
 
     res.status(200).json({ success: true, message: "Order accepted successfully", shopOrder });
   } catch (error) {
