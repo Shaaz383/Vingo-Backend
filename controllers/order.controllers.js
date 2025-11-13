@@ -5,7 +5,7 @@ import Item from "../models/item.modal.js";
 import Shop from "../models/shop.model.js";
 import mongoose from "mongoose";
 import { getAllAvailableDeliveryBoys } from "../utils/delivery.utils.js";
-import { socketIO, onlineUsers } from '../index.js'; // Ensure socketIO and onlineUsers are imported
+import { socketIO, onlineUsers } from '../index.js'; 
 
 /**
  * Place a new order
@@ -69,7 +69,7 @@ export const placeOrder = async (req, res) => {
     });
 
     // Calculate order totals
-    let totalAmount = 0;
+    let totalAmount = 0; // Grand total including fees/taxes
     let totalQuantity = 0;
     
     // Create the main order
@@ -78,8 +78,8 @@ export const placeOrder = async (req, res) => {
       deliveryAddress,
       payment: payment || { method: "COD", status: "pending" },
       notes,
-      totalAmount: 0, // Will update after creating shop orders
-      totalQuantity: 0, // Will update after creating shop orders
+      totalAmount: 0, 
+      totalQuantity: 0, 
       shopOrders: []
     });
     
@@ -95,13 +95,17 @@ export const placeOrder = async (req, res) => {
         shopTotalQuantity += item.quantity;
       });
       
-      // Calculate tax and delivery fee (can be customized based on business logic)
-      const tax = subtotal * 0.05; // 5% tax
-      const deliveryFee = 40; // Fixed delivery fee
+      // FIXED: Use consistent fee logic
+      const TAX_RATE = 0.05;
+      const FIXED_DELIVERY_FEE = 40; 
+      
+      // Use Math.round for integers to avoid display issues
+      const tax = Math.round(subtotal * TAX_RATE); 
+      const deliveryFee = FIXED_DELIVERY_FEE; 
       const total = subtotal + tax + deliveryFee;
       
-      // Update order totals
-      totalAmount += total;
+      // Update GRAND total
+      totalAmount += total; 
       totalQuantity += shopTotalQuantity;
       
       // Status is PENDING. It awaits OWNER acceptance.
@@ -109,10 +113,10 @@ export const placeOrder = async (req, res) => {
         order: order._id,
         shop: shop._id,
         subtotal,
-        tax,
-        deliveryFee,
-        total,
-        items: [], // Will be populated after creating shop order items
+        tax, // Store calculated tax
+        deliveryFee, // Store fixed delivery fee
+        total, // Store total including tax and fee
+        items: [],
         status: "pending" // Initial status remains PENDING for Owner to accept
       });
       
@@ -160,8 +164,8 @@ export const placeOrder = async (req, res) => {
     
     const shopOrders = await Promise.all(shopOrderPromises);
     
-    // Update the main order with totals and shop orders
-    order.totalAmount = totalAmount;
+    // Update the main order with the CORRECT Grand Totals
+    order.totalAmount = totalAmount; 
     order.totalQuantity = totalQuantity;
     order.shopOrders = shopOrders.map(shopOrder => shopOrder._id);
     
