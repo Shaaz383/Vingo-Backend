@@ -16,9 +16,10 @@ dotenv.config();
 
 const app = express();
 const httpServer = createServer(app);
+const allowedOrigins = (process.env.CLIENT_ORIGINS || "http://localhost:5173,http://localhost:5174").split(",").map(s => s.trim());
 const io = new Server(httpServer, {
   cors: {
-    origin: ["http://localhost:5173", "http://localhost:5174"],
+    origin: allowedOrigins,
     credentials: true
   }
 });
@@ -34,8 +35,9 @@ const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 app.use(cookieParser());
+app.set('trust proxy', 1);
 app.use(cors({
-  origin: ["http://localhost:5173", "http://localhost:5174"],
+  origin: (process.env.CLIENT_ORIGINS || "http://localhost:5173,http://localhost:5174").split(",").map(s => s.trim()),
   credentials: true,
 }));
 

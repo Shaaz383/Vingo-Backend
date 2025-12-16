@@ -3,6 +3,16 @@ import bcrypt from "bcryptjs";
 import genToken from "../utils/token.js";
 import { sendOtpMail } from "../utils/mail.js";
 
+const isProd = process.env.NODE_ENV === 'production';
+const buildCookieOptions = () => ({
+    httpOnly: true,
+    secure: isProd,
+    sameSite: isProd ? 'None' : 'Lax',
+    domain: process.env.COOKIE_DOMAIN || undefined,
+    path: '/',
+    maxAge: 24 * 60 * 60 * 1000
+});
+
 export const signUp = async (req, res) => {
     try {
         const { fullName, email, password, mobile, role } = req.body;
@@ -22,7 +32,7 @@ export const signUp = async (req, res) => {
 
         const newUser = await User.create({ fullName, email, password: hashedPassword, mobile, role });
         const token = await genToken(newUser._id);
-        res.cookie("token", token, { httpOnly: true, secure: false, sameSite: "strict", maxAge: 24 * 60 * 60 * 1000 });
+        res.cookie("token", token, buildCookieOptions());
         res.status(201).json({ user: newUser, token });
         
     } catch (error) {
@@ -42,7 +52,7 @@ export const signIn = async (req, res) => {
             return res.status(400).json({ message: "Invalid password" });
         }
         const token = await genToken(user._id);
-        res.cookie("token", token, { httpOnly: true, secure: false, sameSite: "strict", maxAge: 24 * 60 * 60 * 1000 });
+        res.cookie("token", token, buildCookieOptions());
         res.status(200).json({ user, token }); 
     
         
@@ -53,7 +63,7 @@ export const signIn = async (req, res) => {
 
 export const signOut=async(req,res)=>{
     try {
-        res.clearCookie("token");
+        res.clearCookie("token", { path: '/', domain: process.env.COOKIE_DOMAIN || undefined, sameSite: isProd ? 'None' : 'Lax', secure: isProd });
         res.status(200).json({ message: "Logged out successfully" });
     } catch (error) {
         res.status(500).json({ message: error.message });
@@ -192,12 +202,7 @@ export const googleAuth = async (req, res) => {
         if (user) {
             // User exists, generate token and sign them in
             const token = await genToken(user._id);
-            res.cookie("token", token, { 
-                httpOnly: true, 
-                secure: false, 
-                sameSite: "strict", 
-                maxAge: 24 * 60 * 60 * 1000 
-            });
+            res.cookie("token", token, buildCookieOptions());
             return res.status(200).json({ user, token });
         }
 
@@ -231,12 +236,7 @@ export const googleAuth = async (req, res) => {
         });
 
         const token = await genToken(newUser._id);
-        res.cookie("token", token, { 
-            httpOnly: true, 
-            secure: false, 
-            sameSite: "strict", 
-            maxAge: 24 * 60 * 60 * 1000 
-        });
+        res.cookie("token", token, buildCookieOptions());
 
         res.status(201).json({ user: newUser, token });
     } catch (error) {
