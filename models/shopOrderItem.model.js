@@ -12,7 +12,7 @@ const shopOrderItemSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-shopOrderItemSchema.index({ shopOrder: 1 });
+// Removed duplicate index; 'shopOrder' already has index: true on the field
 
 const ShopOrderItem = mongoose.model("ShopOrderItem", shopOrderItemSchema);
 export default ShopOrderItem;
