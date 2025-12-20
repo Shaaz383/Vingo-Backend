@@ -48,7 +48,19 @@ const corsOptions = {
   allowedHeaders: ['Content-Type','Authorization'],
 };
 app.use(cors(corsOptions));
-app.options('*', cors(corsOptions));
+app.use((req, res, next) => {
+  if (req.method === 'OPTIONS') {
+    const origin = req.headers.origin;
+    if (!origin || corsOrigins.includes(origin)) {
+      res.header('Access-Control-Allow-Origin', origin || '*');
+      res.header('Access-Control-Allow-Credentials', 'true');
+      res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+      res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
+      return res.sendStatus(204);
+    }
+  }
+  next();
+});
 
 app.use("/api/auth", authRouter);
 app.use("/api/user", userRouter); 
