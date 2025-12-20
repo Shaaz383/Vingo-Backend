@@ -36,10 +36,19 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json());
 app.use(cookieParser());
 app.set('trust proxy', 1);
-app.use(cors({
-  origin: (process.env.CLIENT_ORIGINS || "http://localhost:5173,http://localhost:5174").split(",").map(s => s.trim()),
+const corsOrigins = (process.env.CLIENT_ORIGINS || "http://localhost:5173,http://localhost:5174").split(",").map(s => s.trim());
+const corsOptions = {
+  origin: function (origin, callback) {
+    if (!origin) return callback(null, true);
+    const allowed = corsOrigins.includes(origin);
+    callback(allowed ? null : new Error('Not allowed by CORS'), allowed);
+  },
   credentials: true,
-}));
+  methods: ['GET','POST','PUT','PATCH','DELETE','OPTIONS'],
+  allowedHeaders: ['Content-Type','Authorization'],
+};
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 
 app.use("/api/auth", authRouter);
 app.use("/api/user", userRouter); 
