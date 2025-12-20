@@ -48,6 +48,10 @@ app.use("/api/item", itemRouter);
 app.use("/api/order", orderRouter);
 app.use("/api/delivery", deliveryRouter);
 
+app.get('/health', (req, res) => {
+  res.status(200).send('ok');
+});
+
 // Socket.io connection handling
 io.on("connection", (socket) => {
   console.log("A user connected:", socket.id);
