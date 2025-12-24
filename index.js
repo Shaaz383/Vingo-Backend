@@ -99,7 +99,16 @@ io.on("connection", (socket) => {
   });
 });
 
-httpServer.listen(PORT, () => {
-  connectDB();
-  console.log(`Server is running on port ${PORT}`);
-});
+const start = async () => {
+  try {
+    await connectDB();
+    httpServer.listen(PORT, () => {
+      console.log(`Server is running on port ${PORT}`);
+    });
+  } catch (err) {
+    console.error('Failed to connect to MongoDB');
+    process.exit(1);
+  }
+};
+
+start();
