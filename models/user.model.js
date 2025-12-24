@@ -33,6 +33,26 @@ const userSchema = new mongoose.Schema({
     profilePicture: {
         type: String
     },
+    isEmailVerified: {
+        type: Boolean,
+        default: false
+    },
+    isMobileVerified: {
+        type: Boolean,
+        default: false
+    },
+    emailOtp: {
+        type: String
+    },
+    emailOtpExpires: {
+        type: Date
+    },
+    mobileOtp: {
+        type: String
+    },
+    mobileOtpExpires: {
+        type: Date
+    },
     isGoogleUser: {
         type: Boolean,
         default: false
