@@ -7,7 +7,7 @@ import {upload} from "../middlewares/multer.js"
 
 shopRouter.post("/create-edit",isAuth, upload.single("image"), createEditShop);
 shopRouter.get("/get-my",isAuth, getMyShop);
-shopRouter.get("/list", isAuth, getShopsByCity);
+shopRouter.get("/list", getShopsByCity);
 
 
 export default shopRouter;

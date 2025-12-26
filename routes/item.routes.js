@@ -10,7 +10,7 @@ itemRouter.post("/add-item", isAuth , upload.single("image"),addItem)
 itemRouter.post("/edit-item/:itemId", isAuth , upload.single("image"),editItem)
 itemRouter.get("/shop-items", isAuth, getShopItems)
 itemRouter.delete("/delete-item/:itemId", isAuth, deleteItem)
-itemRouter.get("/list", isAuth, listItemsByCity)
+itemRouter.get("/list", listItemsByCity)
 
 
 export default itemRouter;
