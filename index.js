@@ -9,6 +9,7 @@ import shopRouter from "./routes/shop.routes.js";
 import itemRouter from "./routes/item.routes.js";
 import orderRouter from "./routes/order.routes.js";
 import deliveryRouter from "./routes/delivery.routes.js";
+import paymentRouter from "./routes/payment.routes.js";
 import cookieParser from "cookie-parser";
 import cors from "cors";
 
@@ -68,6 +69,7 @@ app.use("/api/shop", shopRouter);
 app.use("/api/item", itemRouter);
 app.use("/api/order", orderRouter);
 app.use("/api/delivery", deliveryRouter);
+app.use("/api/payment", paymentRouter);
 
 app.get('/health', (req, res) => {
   res.status(200).send('ok');

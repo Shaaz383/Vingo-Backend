@@ -14,7 +14,7 @@ const addressSchema = new mongoose.Schema(
 
 const paymentSchema = new mongoose.Schema(
   {
-    method: { type: String, enum: ["COD", "CARD", "UPI"], default: "COD" },
+    method: { type: String, enum: ["COD", "CARD", "UPI", "RAZORPAY"], default: "COD" },
     status: { type: String, enum: ["pending", "paid", "failed", "refunded"], default: "pending" },
     transactionId: { type: String, trim: true },
   },
